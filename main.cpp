@@ -16,7 +16,12 @@ int main () {
 	for(int i = 0; i < 80; i++) {
 		vec.pop_front();
 	}
-	for(int val : vec) {
+	for(int i = 0; i < vec.size(); i++) {
+		std::cout << vec[i] << ' ';
+	}
+	std::cout << '\n';
+	const MyDeque <int> vec2(10, 10);
+	for(int val : vec2) {
 		std::cout << val << ' ';
 	}
 	return 0;

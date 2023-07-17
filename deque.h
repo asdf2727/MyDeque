@@ -7,82 +7,78 @@ typedef long long int sizeT;
 template <typename T>
 class MyDeque {
 private:
-	T *start;
-	T *first, *last;
-	sizeT now_size, max_size;
+	T *start = nullptr;
+	T *first = nullptr, *last = nullptr;
+	sizeT now_size = 0, max_size = 0;
 
-	inline T *GetNext(T *pter, sizeT add = 1) {
+	inline T *GetNext(T *pter, sizeT add = 1) const {
 		return start + (((pter - start) + add) & (max_size - 1));
 	}
-	inline T *GetPrev(T *pter, sizeT dec = 1) {
+	inline T *GetPrev(T *pter, sizeT dec = 1) const {
 		return start + (((pter - start) - dec) & (max_size - 1));
 	}
 
-	sizeT GetPow2(sizeT num) const {
-		return (num < 2 ? 0 : 63 - __builtin_clzll(num));
+	sizeT GetBufferSize(sizeT new_size) const {
+		return 1 << (64 - __builtin_clzll(new_size + 1));
 	}
+
 	void Realloc(sizeT new_size) {
+		if (now_size > new_size) {
+			now_size = new_size;
+		}
 		T *new_start = static_cast <T *>(calloc(new_size, sizeof(T)));
-		last = new_start;
-		for (int i = 0; i < now_size; i++) {
-			*last = *first;
-			last++;
-			first = GetNext(first);
+		for (sizeT i = 0; i < now_size; i++) {
+			*(new_start + i) = *GetNext(first, i);
 		}
 		free(start);
 		first = start = new_start;
+		last = new_start + now_size;
 		max_size = new_size;
 	}
 
 public:
 	MyDeque () {
-		max_size = 1;
-		start = static_cast <T *> (malloc(1 * sizeof(T)));
-		first = last = start;
-		now_size = 0;
+		clear();
 	}
 	MyDeque (sizeT size) {
-		max_size = 1 << GetPow2(size);
-		start = static_cast <T *> (malloc(max_size * sizeof(T)));
-		first = last = start;
-		T elem;
-		for (now_size = 0; now_size < size; now_size++) {
-			*last = elem;
-			last++;
+		Realloc(GetBufferSize(size));
+		now_size = size;
+		last = first + size;
+		T init_val;
+		while(first != last) {
+			*first = init_val;
+			first++;
 		}
+		first = start;
 	}
-	MyDeque (sizeT size, const T &elem) {
-		max_size = 1 << GetPow2(size);
-		start = static_cast <T *> (malloc(max_size * sizeof(T)));;
-		first = last = start;
-		for (now_size = 0; now_size < size; now_size++) {
-			*last = elem;
-			last++;
+	MyDeque (sizeT size, const T &init_val) {
+		Realloc(GetBufferSize(size));
+		now_size = size;
+		last = first + size;
+		while(first != last) {
+			*first = init_val;
+			first++;
 		}
+		first = start;
 	}
 	MyDeque (const MyDeque <T> &to_copy) {
-		max_size = to_copy.max_size;
-		start = static_cast <T *> (malloc(max_size * sizeof(T)));;
-		first = last = start;
-		T *loc = to_copy.first;
-		for (now_size = 0; now_size < to_copy.size; now_size++) {
-			*last = *loc;
-			last++;
-			loc = to_copy.GetNext(loc);
+		Realloc(to_copy.max_size);
+		for (int i = 0; i < now_size; i++) {
+			*(start + i) = *to_copy.GetNext(to_copy.first + i);
 		}
+		now_size = to_copy.now_size;
+		last = start + now_size;
 	}
 
 	MyDeque <T> &operator= (const MyDeque <T> &to_copy) {
-		max_size = to_copy.max_size;
-		free(start);
-		start = static_cast <T *> (malloc(max_size * sizeof(T)));;
-		first = last = start;
-		T *loc = to_copy.first;
-		for (now_size = 0; now_size < to_copy.size; now_size++) {
-			*last = *loc;
-			last++;
-			loc = to_copy.GetNext(loc);
+		now_size = 0;
+		max_size = 0;
+		Realloc(to_copy.max_size);
+		for (int i = 0; i < now_size; i++) {
+			*(start + i) = *to_copy.GetNext(to_copy.first + i);
 		}
+		now_size = to_copy.now_size;
+		last = start + now_size;
 	}
 	MyDeque <T> &operator= (MyDeque <T> &&to_copy) noexcept {
 		free(start);
@@ -91,6 +87,38 @@ public:
 		max_size = to_copy.max_size;
 		first = to_copy.first;
 		return *this;
+	}
+
+	void clear() {
+		free(start);
+		max_size = 1;
+		start = static_cast <T *> (calloc(1, sizeof(T)));
+		first = last = start;
+		now_size = 0;
+	}
+	void resize(sizeT new_size) {
+		T init_val;
+		resize(new_size, init_val);
+	}
+	void resize(sizeT new_size, T &init_val) {
+		if (GetBufferSize(new_size) != max_size) {
+			Realloc(GetBufferSize(new_size));
+		}
+		if (new_size < now_size) {
+			last = GetNext(first + new_size);
+		}
+		else {
+			while (now_size < new_size) {
+				*last = init_val;
+				last++;
+				now_size++;
+			}
+		}
+	}
+	void reserve(sizeT future_size) {
+		if (GetBufferSize(future_size) > max_size) {
+			Realloc(future_size);
+		}
 	}
 
 	sizeT size() const {
@@ -152,6 +180,12 @@ public:
 	}
 	inline T &front() const {
 		return *first;
+	}
+	inline const T &operator[] (sizeT pos) const {
+		return *GetNext(first, pos);
+	}
+	inline T &operator[] (sizeT pos) {
+		return *GetNext(first, pos);
 	}
 
 private:
